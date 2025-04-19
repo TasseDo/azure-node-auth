@@ -1,4 +1,3 @@
-// server.js
 require('dotenv').config();
 const express = require('express');
 const morgan = require('morgan');
@@ -6,6 +5,38 @@ const session = require('express-session');
 const passport = require('./auth');
 
 const app = express();
+
+const axios = require('axios');
+
+async function checkGroupMembership(req, res, next) {
+  const token = req.user?.accessToken;
+  if (!token) return res.status(401).send('No access token');
+
+  try {
+    // Get all groups the user is a direct or transitive member of
+    const response = await axios.get('https://graph.microsoft.com/v1.0/me/memberOf', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    const groups = response.data.value;
+    const inTestGroup = groups.some(group =>
+      group.displayName === 'testgroup' || group.id === 'your-group-id-here'
+    );
+
+    if (inTestGroup) {
+      next(); // User is authorized
+    } else {
+      res.status(403).send('🚫 Not authorized – not in testgroup');
+    }
+
+  } catch (err) {
+    console.error('Error checking group membership:', err);
+    res.status(500).send('Internal error');
+  }
+}
+
 
 app.use(morgan('dev'));
 app.use(session({
@@ -37,6 +68,11 @@ app.get('/auth/openid/return',
   app.get('/whoami', (req, res) => {
     res.send(req.user ? req.user : '🚫 Not authenticated');
   });
+
+  app.get('/protected', checkGroupMembership, (req, res) => {
+    res.send('✅ You are in testgroup!');
+  });
+  
   
 // Logout
 app.get('/logout', (req, res) => {

@@ -1,4 +1,3 @@
-// auth.js
 const passport = require('passport');
 const { OIDCStrategy } = require('passport-azure-ad');
 
@@ -10,7 +9,7 @@ const config = {
   responseMode: 'query',
   redirectUrl: process.env.REDIRECT_URI,
   allowHttpForRedirectUrl: true,
-  scope: ['openid', 'profile'],
+  scope: ['openid', 'profile', 'offline_access', 'User.Read', 'GroupMember.Read.All'],
   passReqToCallback: false,
 };
 
@@ -24,6 +23,7 @@ passport.deserializeUser((obj, done) => {
 passport.use(
   new OIDCStrategy(config, (iss, sub, profile, accessToken, refreshToken, done) => {
     if (!profile.oid) return done(new Error('No OID found'), null);
+    profile.accessToken = accessToken; 
     return done(null, profile);
   })
 );
